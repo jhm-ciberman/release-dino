@@ -1,0 +1,32 @@
+{
+    "name": "release-dino",
+    "version": "0.0.0",
+    "description": "A bot for notifying the Discord server of new github releases.",
+    "keywords": [],
+    "author": {
+        "name": "Javier \"Ciberman\" Mora",
+        "email": "javier@playsaurus.com"
+    },
+    "private": true,
+    "license": "See LICENSE",
+    "main": "dist/index.js",
+    "engines": {
+        "node": ">=22.0.0"
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "node --env-file=.env -r ts-node/register bin/server.ts",
+        "lint": "eslint ."
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.17.0",
+        "@types/node": "^22.10.5",
+        "eslint": "^9.17.0",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.7.2",
+        "typescript-eslint": "^8.19.1"
+    },
+    "dependencies": {
+        "discord.js": "^14.17.2"
+    }
+}
