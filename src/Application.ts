@@ -7,7 +7,6 @@ import path from 'node:path';
  * The application instance.
  */
 export default class Application {
-
     /**
      * The Discord bot token.
      */
@@ -63,9 +62,18 @@ export default class Application {
         return markdown;
     }
 
+    private _slug(text: string): string {
+        return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
+    }
 
-    public async renderMarkdown(markdown: string): Promise<string> {
-        const version = 'v2024.01.02a';
+    public async renderMarkdown(options: {
+        tag: string, 
+        title: string, 
+        body: string,
+        repo: string,
+    }): Promise<string> {
+        const {tag, title, body, repo} = options;
+
         const cssText = `
             @import "https://cdn.jsdelivr.net/npm/normalize.css/normalize.min.css";
             @import "https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.min.css";
@@ -73,13 +81,22 @@ export default class Application {
             .markdown-body { padding: 2rem; }
         `;
 
-        markdown = this._rewriteLinks(markdown);
+        const markdown = this._rewriteLinks(body);
 
-        const filename = randomUUID() + '-' + version.replaceAll('.', '-').toLowerCase();
+        const filename = randomUUID() + '-' + this._slug(tag);
         const folder = path.resolve(__dirname, '../storage');
         
+        const inputText = [
+            `# ${title || tag}`,
+            '',
+            tag ? `**Tag**: ${tag}` : '',
+            `**Repository**: ${repo}`,
+            '',
+            markdown || '(no description)',
+        ].join('\n');
+        
         const response = await mdimg({
-            inputText: `# ${version}\n\n${markdown}`,
+            inputText,
             outputFilename: `${folder}/${filename}.png`,
             encoding: 'binary',
             type: 'png',
@@ -103,7 +120,7 @@ export default class Application {
 
         //console.info(`Logged in as ${client.user?.username}!`);
 
-        const markdown = `
+        const _markdown = `
 <!-- Release notes generated using configuration in .github/release.yml at main -->
 
 ## What's Changed
@@ -123,7 +140,43 @@ export default class Application {
 **Full Changelog**: https://github.com/playsaurus-inc/playsaurus-web/compare/v2024.12.30b...v2024.01.02a
 `;
 
-        const path = await this.renderMarkdown(markdown);
-        console.log(path);
+        //const path = await this.renderMarkdown(markdown);
+        //console.log(path);
     }
+
+    public async handleReleaseEvent(payload: ReleaseEvent) {
+        console.log('Received release event:', payload);
+
+        const path = await this.renderMarkdown({
+            title: payload.release.name,
+            tag: payload.release.tag_name,
+            body: payload.release.body,
+            repo: payload.repository.full_name,
+        });
+
+        console.log(path);
+    };
+}
+
+
+export interface ReleaseEvent { // It has more fields, but we only care about these
+    action: string;
+    release: {
+        id: number;
+        url: string;
+        tag_name: string;
+        name: string;
+        published_at: string;
+        body: string;
+    };
+    repository: {
+        name: string;
+        full_name: string;
+        owner: {
+            login: string;
+        };
+    };
+    sender: {
+        login: string;
+    };
 }

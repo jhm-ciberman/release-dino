@@ -1,15 +1,34 @@
-import Application from './Application';
+// Let's create a simple HTTP endpoint `/webhooks/releases` that receives the GitHub release event 
+// and logs the release information.
+// We won't use any framework for this example, just the built-in Node.js HTTP server.
 
-/*
- |---------------------------------------------------------------------
- | Initialize the Discord client
- |---------------------------------------------------------------------
- |
- | Let's initialize the Discord client and log in with the bot token
- | so we can start receiving events and commands in our bot.
- |
- */
+import Application, { ReleaseEvent } from './Application';
+import Fastify from 'fastify';
+
+const app = new Application();
+
+
+const fastify = Fastify({ logger: true });
+
+fastify.get('/', async (_request, reply) => {
+  return reply.status(200).send({ hello: 'world' });
+});
+
+fastify.post('/webhooks/releases', async (request, reply) => {
+    await app.handleReleaseEvent(request.body as ReleaseEvent);
+    return reply.status(200).send({ ok: true });
+});
 
 (async () => {
-    await new Application().start();
+    const port = parseInt(process.env.PORT || '3000');
+    try {
+        await fastify.listen({ port })
+    } catch (err) {
+        fastify.log.error(err)
+        process.exit(1)
+    }
 })();
+
+
+
+
