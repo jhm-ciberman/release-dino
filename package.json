@@ -8,7 +8,7 @@
         "email": "javier@playsaurus.com"
     },
     "private": true,
-    "license": "See LICENSE",
+    "license": "MIT",
     "main": "dist/index.js",
     "engines": {
         "node": ">=22.0.0"
