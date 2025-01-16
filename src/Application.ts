@@ -62,10 +62,6 @@ export default class Application {
         return markdown;
     }
 
-    private _slug(text: string): string {
-        return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').replace(/-+$/, '');
-    }
-
     public async renderMarkdown(options: {
         tag: string, 
         title: string, 
@@ -82,9 +78,7 @@ export default class Application {
         `;
 
         const markdown = this._rewriteLinks(body);
-
-        const filename = randomUUID() + '-' + this._slug(tag);
-        const folder = path.resolve(__dirname, '../storage');
+        const outputFilename = path.resolve(__dirname, '../storage', randomUUID() + '.png');
         
         const inputText = [
             `# ${title || tag}`,
@@ -97,7 +91,7 @@ export default class Application {
         
         const response = await mdimg({
             inputText,
-            outputFilename: `${folder}/${filename}.png`,
+            outputFilename,
             encoding: 'binary',
             type: 'png',
             cssTemplate: 'github',
@@ -148,10 +142,10 @@ export default class Application {
         console.log('Received release event:', payload);
 
         const path = await this.renderMarkdown({
-            title: payload.release.name,
-            tag: payload.release.tag_name,
-            body: payload.release.body,
-            repo: payload.repository.full_name,
+            title: payload.release.name || '',
+            tag: payload.release.tag_name || '',
+            body: payload.release.body || '',
+            repo: payload.repository.full_name || '',
         });
 
         console.log(path);
