@@ -20,6 +20,9 @@ fastify.post('/webhooks/releases', async (request, reply) => {
 });
 
 (async () => {
+
+    app.startBot();
+
     const port = parseInt(process.env.PORT || '3000');
     try {
         await fastify.listen({ port })

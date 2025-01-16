@@ -1,7 +1,43 @@
-import { Client, Events, GatewayIntentBits } from 'discord.js';
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, Client, Events, GatewayIntentBits, SendableChannels } from 'discord.js';
 import { mdimg } from 'mdimg';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
+import { getDinoPhrases, getDinoVerb } from './dino-phrases';
+import { unlink } from 'node:fs';
+
+class Release {
+    public title: string = '';
+    public tag: string = '';
+    public body: string = '';
+    public repo: string = '';
+    public url: string = '';
+    public user: string = '';
+    public userUrl: string = '';
+    public repoUrl: string = '';
+
+    public static fromEvent(event: ReleaseEvent): Release {
+        const release = new Release();
+
+        release.title = event.release.name || '';
+        release.tag = event.release.tag_name || '';
+        release.body = event.release.body || '';
+        release.repo = event.repository.full_name || '';
+        release.repoUrl = event.repository.html_url || '';
+        release.url = event.release.html_url || '';
+        release.user = event.sender.login || '';
+        release.userUrl = event.sender.html_url || '';
+
+        return release;
+    }
+
+    get repoOwner() {
+        return this.repo.split('/')[0];
+    }
+
+    get repoName() {
+        return this.repo.split('/')[1];
+    }
+}
 
 /**
  * The application instance.
@@ -13,19 +49,19 @@ export default class Application {
     private _discordToken: string = process.env.DISCORD_TOKEN!;
 
     /**
-     * The Discord bot client ID.
-     */
-    private _discordClientId: string = process.env.DISCORD_CLIENT_ID!;
-
-    /**
-     * The Guid ID where the bot is running.
-     */
-    private _guildId: string = process.env.GUILD_ID!;
-
-    /**
      * The channel ID where to post the updates.
      */
     private _channelID: string = process.env.CHANNEL_ID!;
+
+    /**
+     * The Discord bot client instance.
+     */
+    private _client: Client<true> | null = null;
+
+    /**
+     * The channel where to post the updates.
+     */
+    private _channel: SendableChannels | null = null;
 
     /**
      * Create a new instance of the application.
@@ -34,10 +70,10 @@ export default class Application {
         //
     }
 
-    private _initDiscordClient(): Promise<Client<true>> {        
+    private _initDiscordClient(): Promise<Client<true>> {
         return new Promise<Client<true>>((resolve, _reject) => {
-            const client = new Client({ 
-                intents: [ GatewayIntentBits.Guilds ],
+            const client = new Client({
+                intents: [GatewayIntentBits.Guilds],
             });
 
             client.once(Events.ClientReady, readyClient => {
@@ -62,14 +98,7 @@ export default class Application {
         return markdown;
     }
 
-    public async renderMarkdown(options: {
-        tag: string, 
-        title: string, 
-        body: string,
-        repo: string,
-    }): Promise<string> {
-        const {tag, title, body, repo} = options;
-
+    public async renderMarkdown(release: Release): Promise<string> {
         const cssText = `
             @import "https://cdn.jsdelivr.net/npm/normalize.css/normalize.min.css";
             @import "https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.min.css";
@@ -77,20 +106,11 @@ export default class Application {
             .markdown-body { padding: 2rem; }
         `;
 
-        const markdown = this._rewriteLinks(body);
+        const markdown = this._rewriteLinks(release.body);
         const outputFilename = path.resolve(__dirname, '../storage', randomUUID() + '.png');
-        
-        const inputText = [
-            `# ${title || tag}`,
-            '',
-            tag ? `**Tag**: ${tag}` : '',
-            `**Repository**: ${repo}`,
-            '',
-            markdown || '(no description)',
-        ].join('\n');
-        
+
         const response = await mdimg({
-            inputText,
+            inputText: markdown || '(no description)',
             outputFilename,
             encoding: 'binary',
             type: 'png',
@@ -108,56 +128,125 @@ export default class Application {
     /**
      * Start the application.
      */
-    public async start() {
-        console.info('Logging in... Please wait.');
-        //const client = await this._initDiscordClient();
+    public async startBot() {
+        console.info('Logging in into Discord... Please wait.');
+        this._client = await this._initDiscordClient();
+        console.info(`Logged in as ${this._client.user?.username}!`);
 
-        //console.info(`Logged in as ${client.user?.username}!`);
+        let channel = this._client.channels.cache.get(this._channelID) || null;
 
-        const _markdown = `
-<!-- Release notes generated using configuration in .github/release.yml at main -->
+        if (!channel) {
+            channel = await this._client.channels.fetch(this._channelID);
+        }
 
-## What's Changed
-### New Features 🚀
-* Introduce new sampled algorithm for performance score in AdCreatives by @jhm-ciberman in https://github.com/playsaurus-inc/playsaurus-web/pull/760
-### Bug Fixes 🐛
-* [FIX] Server Error when no multiplier offset is present by @PauloAK in https://github.com/playsaurus-inc/playsaurus-web/pull/753
-* Fix validation rules for Product SKU in Nova by @jhm-ciberman in https://github.com/playsaurus-inc/playsaurus-web/pull/759
-### Dependency Updates 📦
-* Bump vite from 6.0.2 to 6.0.6 by @dependabot in https://github.com/playsaurus-inc/playsaurus-web/pull/758
-* Bump laravel-precognition-alpine from 0.5.13 to 0.5.14 by @dependabot in https://github.com/playsaurus-inc/playsaurus-web/pull/757
-* Bump axios from 1.7.8 to 1.7.9 by @dependabot in https://github.com/playsaurus-inc/playsaurus-web/pull/754
-* Bump alpinejs from 3.14.3 to 3.14.8 by @dependabot in https://github.com/playsaurus-inc/playsaurus-web/pull/756
-* Bump @alpinejs/mask from 3.14.5 to 3.14.8 by @dependabot in https://github.com/playsaurus-inc/playsaurus-web/pull/755
+        if (!channel) {
+            throw new Error('Channel not found.');
+        }
 
+        if (!channel.isSendable()) {
+            throw new Error('Channel is not sendable.');
+        }
 
-**Full Changelog**: https://github.com/playsaurus-inc/playsaurus-web/compare/v2024.12.30b...v2024.01.02a
-`;
-
-        //const path = await this.renderMarkdown(markdown);
-        //console.log(path);
+        this._channel = channel;
     }
 
-    public async handleReleaseEvent(payload: ReleaseEvent) {
-        console.log('Received release event:', payload);
+    private async _sendDiscordMessage(release: Release, imagePath: string) {
+        if (!this._client) return;
+        if (!this._channel) return;
 
-        const path = await this.renderMarkdown({
-            title: payload.release.name || '',
-            tag: payload.release.tag_name || '',
-            body: payload.release.body || '',
-            repo: payload.repository.full_name || '',
+        const file = new AttachmentBuilder(imagePath)
+            .setName('release.png')
+            .setDescription(`Release ${release.tag || release.title} in ${release.repoName}`);
+
+        const phrases = getDinoPhrases(2).map(phrase => `> ${phrase}`).join('\n');
+
+        const dinoPhrases = [
+            `> **🦖 The Release Dino ${getDinoVerb()}:**`,
+            phrases,
+        ].join('\n');
+
+        const content = [
+            `## New release ${release.title || release.tag} in ${release.repoName}`,
+            `- **🏷️ Tag**: ${release.tag || '—'}`,
+            `- **📦 Repository**: ${release.repo || '—'}`,
+            `- **👨‍💻 Released by**: @${release.user}`,
+            `- **📖 Read more**: ${release.url || '—'}`,
+            '',
+            dinoPhrases,
+        ].join('\n');
+
+        const releaseButton = new ButtonBuilder()
+            .setURL(release.url)
+            .setLabel('View Release')
+            .setStyle(ButtonStyle.Link)
+            .setEmoji('🚀');
+
+        const goToRepoButton = new ButtonBuilder()
+            .setURL(release.repoUrl)
+            .setLabel('Go to Repo')
+            .setStyle(ButtonStyle.Link)
+            .setEmoji('📦');
+
+        const row = new ActionRowBuilder()
+            .addComponents(releaseButton, goToRepoButton);
+
+        await this._channel.send({
+            files: [file],
+            content,
+            components: [row as never],
         });
+    }
 
-        console.log(path);
+    private _deleteImage(imagePath: string): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            unlink(imagePath, err => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve();
+                }
+            });
+        });
+    }
+
+    /**
+     * Handle the release event.
+     * 
+     * @param payload The release event payload.
+     * @returns A promise that resolves when the event is handled.
+     */
+    public async handleReleaseEvent(payload: ReleaseEvent): Promise<void> {
+        if (!this._client) return;
+
+        console.log('Received release event:');
+
+        const onlyPublished = true;
+        if (onlyPublished && payload.action !== 'published') {
+            console.info(`Ignoring non-published release. Action: ${payload.action}`);
+            return;
+        }
+
+        console.info('Rendering markdown...');
+        const release = Release.fromEvent(payload);
+
+        const imagePath = await this.renderMarkdown(release);
+
+        console.info('Sending message...');
+        await this._sendDiscordMessage(release, imagePath);
+        console.info('Message sent.');
+
+        console.info('Deleting image...');
+        await this._deleteImage(imagePath);
     };
 }
 
 
 export interface ReleaseEvent { // It has more fields, but we only care about these
-    action: string;
+    action: 'created' | 'deleted' | 'edited' | 'prereleased' | 'published' | 'released' | 'unpublished';
     release: {
         id: number;
         url: string;
+        html_url: string;
         tag_name: string;
         name: string;
         published_at: string;
@@ -166,11 +255,13 @@ export interface ReleaseEvent { // It has more fields, but we only care about th
     repository: {
         name: string;
         full_name: string;
+        html_url: string;
         owner: {
             login: string;
         };
     };
     sender: {
         login: string;
+        html_url: string;
     };
 }
