@@ -24,6 +24,9 @@ node_modules/
 
 dist/
 
-# SQLite Database files
-*.sqlite
-*.sqlite3
+# Storage folder
+storage/*
+!storage/.gitkeep
+
+# MDImg temp files
+.mdimg_temp_*

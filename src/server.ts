@@ -10,4 +10,6 @@ import Application from './Application';
  |
  */
 
-new Application().start();
+(async () => {
+    await new Application().start();
+})();
