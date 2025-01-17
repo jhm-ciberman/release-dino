@@ -118,6 +118,10 @@ export default class Application {
             extensions: true,
             width: 1000,
             cssText,
+            puppeteerProps: {
+                browser: 'chrome',
+                headless: 'shell',
+            },
         });
 
         return response.path!;
