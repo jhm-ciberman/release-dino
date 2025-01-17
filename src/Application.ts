@@ -120,7 +120,7 @@ export default class Application {
             cssText,
             puppeteerProps: {
                 browser: 'chrome',
-                headless: 'shell',
+                executablePath: process.env.CHROME_BIN || undefined,
             },
         });
 
