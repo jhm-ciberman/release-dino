@@ -109,6 +109,11 @@ export default class Application {
         const markdown = this._rewriteLinks(release.body);
         const outputFilename = path.resolve(__dirname, '../storage', randomUUID() + '.png');
 
+        const executablePath = process.env.CHROME_BIN || undefined;
+
+        console.info('Rendering markdown to image...');
+        console.info(`Chrome Executable path: ${executablePath}`);
+
         const response = await mdimg({
             inputText: markdown || '(no description)',
             outputFilename,
@@ -120,14 +125,12 @@ export default class Application {
             cssText,
             puppeteerProps: {
                 browser: 'chrome',
-                executablePath: process.env.CHROME_BIN || undefined,
+                executablePath,
             },
         });
 
         return response.path!;
     }
-
-
 
     /**
      * Start the application.
@@ -154,11 +157,11 @@ export default class Application {
         this._channel = channel;
     }
 
-    private async _sendDiscordMessage(release: Release, imagePath: string) {
+    private async _sendDiscordMessage(release: Release, imagePath: string | null = null) {
         if (!this._client) return;
         if (!this._channel) return;
 
-        const file = new AttachmentBuilder(imagePath)
+        const file = !imagePath ? null : new AttachmentBuilder(imagePath)
             .setName('release.png')
             .setDescription(`Release ${release.tag || release.title} in ${release.repoName}`);
 
@@ -195,7 +198,7 @@ export default class Application {
             .addComponents(releaseButton, goToRepoButton);
 
         await this._channel.send({
-            files: [file],
+            files: file ? [file] : undefined,
             content,
             components: [row as never],
         });
@@ -233,17 +236,24 @@ export default class Application {
         console.info('Rendering markdown...');
         const release = Release.fromEvent(payload);
 
-        const imagePath = await this.renderMarkdown(release);
+        let imagePath: string | null = null;
+        try {
+            imagePath = await this.renderMarkdown(release);
+        } catch (error) {
+            console.error('Failed to render markdown:', error);
+        }
 
         console.info('Sending message...');
         await this._sendDiscordMessage(release, imagePath);
         console.info('Message sent.');
 
-        console.info('Deleting image...');
-        await this._deleteImage(imagePath);
+        
+        if (imagePath) {
+            console.info('Deleting image...');
+            await this._deleteImage(imagePath);
+        }
     };
 }
-
 
 export interface ReleaseEvent { // It has more fields, but we only care about these
     action: 'created' | 'deleted' | 'edited' | 'prereleased' | 'published' | 'released' | 'unpublished';
