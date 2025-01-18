@@ -29,6 +29,7 @@
     "dependencies": {
         "discord.js": "^14.17.2",
         "fastify": "^5.2.1",
-        "mdimg": "^1.4.3"
+        "mdimg": "^1.4.3",
+        "pino-pretty": "^13.0.0"
     }
 }

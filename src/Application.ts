@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { getDinoPhrases, getDinoVerb } from './dino-phrases';
 import fs from 'node:fs/promises';
+import { BaseLogger } from 'pino';
 
 class Release {
     public title: string = '';
@@ -43,6 +44,18 @@ class Release {
  * The application instance.
  */
 export default class Application {
+
+    public static readonly defaultLogger: BaseLogger = {
+        info: console.info,
+        error: console.error,
+        warn: console.warn,
+        debug: console.debug,
+        trace: console.trace,
+        fatal: console.error,
+        level: 'info',
+        silent: () => {},
+    };
+
     /**
      * The Discord bot token.
      */
@@ -62,6 +75,11 @@ export default class Application {
      * The channel where to post the updates.
      */
     private _channel: SendableChannels | null = null;
+
+    /**
+     * The logger instance.
+     */
+    public logger: BaseLogger = Application.defaultLogger;
 
     /**
      * Create a new instance of the application.
@@ -111,8 +129,8 @@ export default class Application {
 
         const executablePath = process.env.CHROME_BIN || undefined;
 
-        console.info('Rendering markdown to image...');
-        console.info(`Chrome Executable path: ${executablePath}`);
+        this.logger.info('Rendering markdown to image...');
+        this.logger.info(`Chrome Executable path: ${executablePath}`);
 
         const response = await mdimg({
             inputText: markdown || '(no description)',
@@ -136,9 +154,9 @@ export default class Application {
      * Start the application.
      */
     public async startBot() {
-        console.info('Logging in into Discord... Please wait.');
+        this.logger.info('Logging in into Discord... Please wait.');
         this._client = await this._initDiscordClient();
-        console.info(`Logged in as ${this._client.user?.username}!`);
+        this.logger.info(`Logged in as ${this._client.user?.username}!`);
 
         let channel = this._client.channels.cache.get(this._channelID) || null;
 
@@ -213,31 +231,31 @@ export default class Application {
     public async handleReleaseEvent(payload: ReleaseEvent): Promise<void> {
         if (!this._client) return;
 
-        console.log('Received release event:');
+        this.logger.info('Received release event:');
 
         const onlyPublished = true;
         if (onlyPublished && payload.action !== 'published') {
-            console.info(`Ignoring non-published release. Action: ${payload.action}`);
+            this.logger.info(`Ignoring non-published release. Action: ${payload.action}`);
             return;
         }
 
-        console.info('Rendering markdown...');
+        this.logger.info('Rendering markdown...');
         const release = Release.fromEvent(payload);
 
         let imagePath: string | null = null;
         try {
             imagePath = await this.renderMarkdown(release.body);
         } catch (error) {
-            console.error('Failed to render markdown:', error);
+            this.logger.error('Failed to render markdown:', error);
         }
 
-        console.info('Sending message...');
+        this.logger.info('Sending message...');
         await this._sendDiscordMessage(release, imagePath);
-        console.info('Message sent.');
+        this.logger.info('Message sent.');
 
         
         if (imagePath) {
-            console.info('Deleting image...');
+            this.logger.info('Deleting image...');
             await fs.unlink(imagePath);
         }
     };

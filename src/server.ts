@@ -8,8 +8,22 @@ import fs from 'node:fs/promises';
 
 const app = new Application();
 
+const fastify = Fastify({ 
+    logger: {
+        transport: {
+            target: 'pino-pretty',
+            options: {
+                ignore: 'pid,hostname',
+            },
+        },
+    },
+});
 
-const fastify = Fastify({ logger: true });
+app.logger = fastify.log;
+
+fastify.addHook('onRequest', async (request, _reply) => {
+    app.logger = request.log;
+});
 
 fastify.get('/', async (_request, reply) => {
   return reply.status(200).send({ hello: 'world' });
@@ -20,7 +34,7 @@ fastify.post('/webhooks/releases', async (request, reply) => {
     return reply.status(200).send({ ok: true });
 });
 
-fastify.get('/markdown-test', async (_request, reply) => {
+fastify.get('/markdown-test', async (request, reply) => {
     const imagePath = await app.renderMarkdown('# This is a test\nHello, **world**! This is a [markdown](https://example.com) test.');
 
     reply.header('Content-Type', 'image/png');
