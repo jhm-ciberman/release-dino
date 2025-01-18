@@ -4,6 +4,7 @@
 
 import Application, { ReleaseEvent } from './Application';
 import Fastify from 'fastify';
+import fs from 'node:fs/promises';
 
 const app = new Application();
 
@@ -17,6 +18,17 @@ fastify.get('/', async (_request, reply) => {
 fastify.post('/webhooks/releases', async (request, reply) => {
     await app.handleReleaseEvent(request.body as ReleaseEvent);
     return reply.status(200).send({ ok: true });
+});
+
+fastify.get('/markdown-test', async (_request, reply) => {
+    const imagePath = await app.renderMarkdown('# This is a test\nHello, **world**! This is a [markdown](https://example.com) test.');
+
+    reply.header('Content-Type', 'image/png');
+    reply.send(await fs.readFile(imagePath));
+
+    await fs.unlink(imagePath);
+
+    return reply;
 });
 
 (async () => {

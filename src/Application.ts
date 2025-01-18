@@ -3,7 +3,7 @@ import { mdimg } from 'mdimg';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { getDinoPhrases, getDinoVerb } from './dino-phrases';
-import { unlink } from 'node:fs';
+import fs from 'node:fs/promises';
 
 class Release {
     public title: string = '';
@@ -98,7 +98,7 @@ export default class Application {
         return markdown;
     }
 
-    public async renderMarkdown(release: Release): Promise<string> {
+    public async renderMarkdown(markdown: string): Promise<string> {
         const cssText = `
             @import "https://cdn.jsdelivr.net/npm/normalize.css/normalize.min.css";
             @import "https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown-light.min.css";
@@ -106,7 +106,7 @@ export default class Application {
             .markdown-body { padding: 2rem; }
         `;
 
-        const markdown = this._rewriteLinks(release.body);
+        markdown = this._rewriteLinks(markdown);
         const outputFilename = path.resolve(__dirname, '../storage', randomUUID() + '.png');
 
         const executablePath = process.env.CHROME_BIN || undefined;
@@ -204,18 +204,6 @@ export default class Application {
         });
     }
 
-    private _deleteImage(imagePath: string): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            unlink(imagePath, err => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            });
-        });
-    }
-
     /**
      * Handle the release event.
      * 
@@ -238,7 +226,7 @@ export default class Application {
 
         let imagePath: string | null = null;
         try {
-            imagePath = await this.renderMarkdown(release);
+            imagePath = await this.renderMarkdown(release.body);
         } catch (error) {
             console.error('Failed to render markdown:', error);
         }
@@ -250,7 +238,7 @@ export default class Application {
         
         if (imagePath) {
             console.info('Deleting image...');
-            await this._deleteImage(imagePath);
+            await fs.unlink(imagePath);
         }
     };
 }
