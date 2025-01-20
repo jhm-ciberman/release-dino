@@ -246,7 +246,7 @@ export default class Application {
         try {
             imagePath = await this.renderMarkdown(release.body);
         } catch (error) {
-            this.logger.error('Failed to render markdown:', error);
+            this.logger.error(error, 'Failed to render markdown');
         }
 
         this.logger.info('Sending message...');
